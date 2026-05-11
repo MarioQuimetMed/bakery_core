@@ -25,3 +25,26 @@ steps:
 - script: |
     pnpm run build
   displayName: 'Build NestJS project'
+
+# TAREA 1: Enviar los archivos compilados al Droplet
+- task: CopyFilesOverSSH@0
+  inputs:
+    sshEndpoint: 'digital_ocean_core'
+    contents: |
+      dist/**
+      package.json
+      pnpm-lock.yaml
+    targetFolder: '/var/www/bakery-core'
+    readyTimeout: '30000'
+
+# TAREA 2: Instalar dependencias en el servidor y reiniciar
+- task: SSH@0
+  inputs:
+    sshEndpoint: 'digital_ocean_core'
+    runOptions: 'inline'
+    inline: |
+      cd /var/www/bakery-core
+      corepack enable
+      pnpm install --prod
+      pm2 restart all || pm2 start dist/main.js --name "bakery_core"
+    readyTimeout: '30000'
