@@ -19,7 +19,7 @@ steps:
   displayName: 'Install pnpm'
 
 - script: |
-    pnpm install --no-frozen-lockfile --no-only-allow-trusted-dependencies
+    pnpm install --no-frozen-lockfile --ignore-scripts
   displayName: 'Install dependencies'
 
 - script: |
