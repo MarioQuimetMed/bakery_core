@@ -19,7 +19,7 @@ steps:
   displayName: 'Install pnpm'
 
 - script: |
-    pnpm install
+    pnpm install --only-build-from-dependencies
   displayName: 'Install dependencies'
 
 - script: |
