@@ -43,8 +43,20 @@ steps:
     sshEndpoint: 'digital_ocean_core'
     runOptions: 'inline'
     inline: |
+      # 1. Cargamos el entorno de Node/NVM
+      export NVM_DIR="$HOME/.nvm"
+      [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+      
+      # 2. Ahora que el sistema conoce 'node' y 'pnpm', entramos a la carpeta
       cd /var/www/bakery-core
+      
+      # 3. Activamos corepack y pnpm
       corepack enable
-      pnpm install --prod
-      pm2 restart all || pm2 start dist/main.js --name "bakery_core"
+      corepack prepare pnpm@latest --activate
+      
+      # 4. Instalamos dependencias de producción
+      pnpm install --prod --ignore-scripts
+      
+      # 5. Reiniciamos con PM2 (asegúrate de que pm2 esté instalado globalmente en el droplet)
+      pm2 restart bakery_core || pm2 start dist/main.js --name "bakery_core"
     readyTimeout: '30000'
