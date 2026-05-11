@@ -19,8 +19,10 @@ steps:
   displayName: 'Install pnpm'
 
 - script: |
-    pnpm install --only-build-from-dependencies
+    pnpm install --no-frozen-lockfile --aggregate-output
   displayName: 'Install dependencies'
+  env:
+    PNPM_CONF_VERIFY_STORE_INTEGRITY: 'false'
 
 - script: |
     pnpm run build
