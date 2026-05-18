@@ -8,6 +8,10 @@ trigger:
 pool:
  vmImage: 'ubuntu-latest'
 
+variables:
+  imageName: 'bakery-core'
+  imageTag: '$(Build.BuildId)'
+
 steps:
 - task: UseNode@1
   inputs:
@@ -25,6 +29,47 @@ steps:
 - script: |
     pnpm run build
   displayName: 'Build NestJS project'
+
+#----------------------
+  #TAREA 3 DOCKERIZAR
+- script: |
+    docker build \
+      --tag $(imageName):$(imageTag) \
+      --tag $(imageName):latest \
+      .
+  displayName: 'Docker - Construir imagen'
+ 
+- script: |
+    docker run -d \
+      --name bakery-test \
+      -p 3000:3000 \
+      $(imageName):latest
+    echo "Contenedor iniciado"
+  displayName: 'Docker - Ejecutar contenedor'
+ 
+- script: |
+    echo "Esperando que la app inicie..."
+    sleep 15
+    curl --fail http://localhost:3000 && echo "OK - La app responde correctamente"
+  displayName: 'Docker - Validar funcionamiento'
+ 
+- script: |
+    echo "=== Logs del contenedor ==="
+    docker logs bakery-test
+    echo ""
+    echo "=== Imagen generada ==="
+    docker images | grep $(imageName)
+    echo ""
+    echo "=== Contenedor en ejecucion ==="
+    docker ps | grep bakery-test
+  displayName: 'Docker - Mostrar estado'
+ 
+- script: |
+    docker stop bakery-test
+    docker rm bakery-test
+  displayName: 'Docker - Limpiar contenedor de prueba'
+  condition: always()
+
 
 # TAREA 1: Enviar los archivos compilados al Droplet
 - task: CopyFilesOverSSH@0
