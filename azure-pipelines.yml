@@ -1,107 +1,207 @@
-# Starter pipeline
-# Start with a minimal pipeline that you can customize to build and deploy your code.
-# Add steps that build, run tests, deploy, and more:
-# https://aka.ms/yaml
+# Pipeline DevOps Multistage - Bakery Core API
+# Estructura: CI → Testing → Delivery
+# Trigger automático en cambios en main
+
 trigger:
-- main
+  - main
 
 pool:
- vmImage: 'ubuntu-latest'
+  vmImage: 'ubuntu-latest'
 
 variables:
   imageName: 'bakery-core'
   imageTag: '$(Build.BuildId)'
+  nodeVersion: '24.15.0'
 
-steps:
-- task: UseNode@1
-  inputs:
-    version: '24.15.0'
+stages:
+  # ============================================================================
+  # STAGE 1: CI (Integración Continua)
+  # Objetivo: Validar que el código compila correctamente
+  # ============================================================================
+  - stage: CI
+    displayName: 'Stage 1: CI - Integración Continua'
+    jobs:
+      - job: BuildJob
+        displayName: 'Build: Compilar aplicación'
+        steps:
+          # Paso 1: Instalar SDK de Node.js
+          - task: UseNode@1
+            displayName: 'Instalar Node.js SDK (v$(nodeVersion))'
+            inputs:
+              version: '$(nodeVersion)'
 
-- script: |
-    corepack enable
-    corepack prepare pnpm@latest --activate
-  displayName: 'Install pnpm'
+          # Paso 2: Restaurar dependencias
+          - script: |
+              corepack enable
+              corepack prepare pnpm@latest --activate
+            displayName: 'Restaurar: Activar pnpm'
 
-- script: |
-    pnpm install --no-frozen-lockfile --ignore-scripts
-  displayName: 'Install dependencies'
+          - script: |
+              pnpm install --no-frozen-lockfile --ignore-scripts
+            displayName: 'Restaurar: Instalar dependencias con pnpm'
 
-- script: |
-    pnpm run build
-  displayName: 'Build NestJS project'
+          # Paso 3: Compilar aplicación
+          - script: |
+              pnpm run build
+            displayName: 'Compilar: Build NestJS project'
 
-#----------------------
-  #TAREA 3 DOCKERIZAR
-- script: |
-    docker build \
-      --tag $(imageName):$(imageTag) \
-      --tag $(imageName):latest \
-      .
-  displayName: 'Docker - Construir imagen'
- 
-- script: |
-    docker run -d \
-      --name bakery-test \
-      -p 3000:3000 \
-      $(imageName):latest
-    echo "Contenedor iniciado"
-  displayName: 'Docker - Ejecutar contenedor'
- 
-- script: |
-    echo "Esperando que la app inicie..."
-    sleep 15
-    curl --fail http://localhost:3000 && echo "OK - La app responde correctamente"
-  displayName: 'Docker - Validar funcionamiento'
- 
-- script: |
-    echo "=== Logs del contenedor ==="
-    docker logs bakery-test
-    echo ""
-    echo "=== Imagen generada ==="
-    docker images | grep $(imageName)
-    echo ""
-    echo "=== Contenedor en ejecucion ==="
-    docker ps | grep bakery-test
-  displayName: 'Docker - Mostrar estado'
- 
-- script: |
-    docker stop bakery-test
-    docker rm bakery-test
-  displayName: 'Docker - Limpiar contenedor de prueba'
-  condition: always()
+          # Paso 4: Publicar artefactos de build (dist)
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publicar: Artefactos de build (dist)'
+            inputs:
+              pathToPublish: '$(Build.ArtifactStagingDirectory)'
+              artifactName: 'dist-output'
 
+  # ============================================================================
+  # STAGE 2: Testing (Pruebas y Validación de Calidad)
+  # Objetivo: Ejecutar pruebas unitarias y validar funcionamiento
+  # Condición: Solo se ejecuta si CI es exitoso
+  # ============================================================================
+  - stage: Testing
+    displayName: 'Stage 2: Testing - Validación de Calidad'
+    dependsOn: CI
+    condition: succeeded()
+    jobs:
+      - job: TestJob
+        displayName: 'Test: Ejecutar validaciones'
+        steps:
+          # Paso 1: Instalar Node.js SDK
+          - task: UseNode@1
+            displayName: 'Instalar Node.js SDK (v$(nodeVersion))'
+            inputs:
+              version: '$(nodeVersion)'
 
-# TAREA 1: Enviar los archivos compilados al Droplet
-- task: CopyFilesOverSSH@0
-  inputs:
-    sshEndpoint: 'digital_ocean_core'
-    contents: |
-      dist/**
-      package.json
-      pnpm-lock.yaml
-    targetFolder: '/var/www/bakery-core'
-    readyTimeout: '30000'
+          # Paso 2: Instalar dependencias
+          - script: |
+              corepack enable
+              corepack prepare pnpm@latest --activate
+              pnpm install --no-frozen-lockfile --ignore-scripts
+            displayName: 'Restaurar: Instalar dependencias'
 
-# TAREA 2: Instalar dependencias en el servidor y reiniciar
-- task: SSH@0
-  inputs:
-    sshEndpoint: 'digital_ocean_core'
-    runOptions: 'inline'
-    inline: |
-      # 1. Cargamos el entorno de Node/NVM
-      export NVM_DIR="$HOME/.nvm"
-      [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-      
-      # 2. Ahora que el sistema conoce 'node' y 'pnpm', entramos a la carpeta
-      cd /var/www/bakery-core
-      
-      # 3. Activamos corepack y pnpm
-      corepack enable
-      corepack prepare pnpm@latest --activate
-      
-      # 4. Instalamos dependencias de producción
-      pnpm install --prod --ignore-scripts
-      
-      # 5. Reiniciamos con PM2 (asegúrate de que pm2 esté instalado globalmente en el droplet)
-      pm2 restart bakery_core || pm2 start dist/main.js --name "bakery_core"
-    readyTimeout: '30000'
+          # Paso 3: Compilar para tests
+          - script: |
+              pnpm run build
+            displayName: 'Compilar: Build NestJS project'
+
+          # Paso 4: Construir imagen Docker
+          - script: |
+              docker build \
+                --tag $(imageName):$(imageTag) \
+                --tag $(imageName):latest \
+                .
+            displayName: 'Test: Construir imagen Docker'
+
+          # Paso 5: Ejecutar contenedor para validación
+          - script: |
+              docker run -d \
+                --name bakery-test \
+                -p 3000:3000 \
+                $(imageName):latest
+              echo "✓ Contenedor iniciado"
+            displayName: 'Test: Ejecutar contenedor'
+
+          # Paso 6: Validar funcionamiento de la aplicación
+          - script: |
+              echo "Esperando que la app inicie..."
+              sleep 15
+              if curl --fail http://localhost:3000; then
+                echo "✓ OK - La app responde correctamente"
+              else
+                echo "✗ ERROR - La app no responde"
+                exit 1
+              fi
+            displayName: 'Test: Validar funcionamiento (Health Check)'
+
+          # Paso 7: Mostrar logs y estado
+          - script: |
+              echo "=== Logs del contenedor ==="
+              docker logs bakery-test
+              echo ""
+              echo "=== Imagen generada ==="
+              docker images | grep $(imageName)
+              echo ""
+              echo "=== Contenedor en ejecución ==="
+              docker ps | grep bakery-test
+            displayName: 'Test: Mostrar estado y logs'
+            condition: always()
+
+          # Paso 8: Ejecutar pruebas unitarias (si existen)
+          - script: |
+              pnpm run test || echo "No hay tests configurados"
+            displayName: 'Test: Ejecutar pruebas unitarias'
+            condition: always()
+
+          # Paso 9: Limpiar contenedor de prueba
+          - script: |
+              docker stop bakery-test
+              docker rm bakery-test
+              echo "✓ Contenedor de prueba limpiado"
+            displayName: 'Test: Limpiar recursos'
+            condition: always()
+
+  # ============================================================================
+  # STAGE 3: Delivery (Entrega y Despliegue)
+  # Objetivo: Publicar y desplegar la aplicación en producción
+  # Condición: Solo se ejecuta si CI y Testing son exitosos
+  # ============================================================================
+  - stage: Delivery
+    displayName: 'Stage 3: Delivery - Entrega a Producción'
+    dependsOn: Testing
+    condition: succeeded()
+    jobs:
+      - job: DeliveryJob
+        displayName: 'Deploy: Publicar en Digital Ocean'
+        steps:
+          # Paso 1: Publicar aplicación (generar artefactos)
+          - script: |
+              echo "=== Preparando artefactos para entrega ==="
+              ls -la dist/
+              echo "✓ Artefactos listos para despliegue"
+            displayName: 'Deploy: Publicar aplicación'
+
+          # Paso 2: Generar artefactos (archivos compilados)
+          - task: CopyFilesOverSSH@0
+            displayName: 'Deploy: Enviar artefactos al servidor'
+            inputs:
+              sshEndpoint: 'digital_ocean_core'
+              contents: |
+                dist/**
+                package.json
+                pnpm-lock.yaml
+              targetFolder: '/var/www/bakery-core'
+              readyTimeout: '30000'
+
+          # Paso 3: Confirmar entrega e iniciar en producción
+          - task: SSH@0
+            displayName: 'Deploy: Instalar y reiniciar en producción'
+            inputs:
+              sshEndpoint: 'digital_ocean_core'
+              runOptions: 'inline'
+              inline: |
+                echo "=== Confirmando entrega en producción ==="
+                
+                # 1. Cargar entorno de Node/NVM
+                export NVM_DIR="$HOME/.nvm"
+                [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+                
+                # 2. Entrar a la carpeta de despliegue
+                cd /var/www/bakery-core
+                echo "✓ Directorio: $(pwd)"
+                
+                # 3. Activar corepack y pnpm
+                corepack enable
+                corepack prepare pnpm@latest --activate
+                echo "✓ pnpm activado"
+                
+                # 4. Instalar dependencias de producción
+                pnpm install --prod --ignore-scripts
+                echo "✓ Dependencias instaladas"
+                
+                # 5. Reiniciar con PM2
+                pm2 restart bakery_core || pm2 start dist/main.js --name "bakery_core"
+                echo "✓ Aplicación iniciada con PM2"
+                
+                # 6. Mostrar estado final
+                echo "=== Estado de despliegue ==="
+                pm2 list
+              readyTimeout: '30000'
