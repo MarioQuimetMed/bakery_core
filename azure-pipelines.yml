@@ -3,15 +3,19 @@
 # Trigger automático en cambios en main
 
 trigger:
-  - main
+  - benjamin-dev
 
 pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  imageName: 'bakery-core'
-  imageTag: '$(Build.BuildId)'
-  nodeVersion: '24.15.0'
+  - group: bakery-secrets
+  - name: imageName
+    value: 'bakery-core'
+  - name: imageTag
+    value: '$(Build.BuildId)'
+  - name: nodeVersion
+    value: '24.15.0'
 
 stages:
   # ============================================================================
@@ -96,6 +100,13 @@ stages:
               docker run -d \
                 --name bakery-test \
                 -p 3000:3000 \
+                -e DATABASE_URL="$(DATABASE_URL)" \
+                -e JWT_SECRET="$(JWT_SECRET)" \
+                -e JWT_REFRESH_SECRET="$(JWT_REFRESH_SECRET)" \
+                -e JWT_EXPIRES_IN="$(JWT_EXPIRES_IN)" \
+                -e JWT_REFRESH_EXPIRES_IN="$(JWT_REFRESH_EXPIRES_IN)" \
+                -e PORT="$(PORT)" \
+                -e API_PREFIX="$(API_PREFIX)" \
                 $(imageName):latest
               echo "✓ Contenedor iniciado"
             displayName: 'Test: Ejecutar contenedor'
@@ -147,7 +158,7 @@ stages:
   - stage: Delivery
     displayName: 'Stage 3: Delivery - Entrega a Producción'
     dependsOn: Testing
-    condition: succeeded()
+    condition: false
     jobs:
       - job: DeliveryJob
         displayName: 'Deploy: Publicar en Digital Ocean'
@@ -196,8 +207,20 @@ stages:
                 # 4. Instalar dependencias de producción
                 pnpm install --prod --ignore-scripts
                 echo "✓ Dependencias instaladas"
-                
-                # 5. Reiniciar con PM2
+
+                # 5. Crear archivo .env con variables del pipeline
+                cat > .env << 'EOF'
+                DATABASE_URL=$(DATABASE_URL)
+                JWT_SECRET=$(JWT_SECRET)
+                JWT_REFRESH_SECRET=$(JWT_REFRESH_SECRET)
+                JWT_EXPIRES_IN=$(JWT_EXPIRES_IN)
+                JWT_REFRESH_EXPIRES_IN=$(JWT_REFRESH_EXPIRES_IN)
+                PORT=$(PORT)
+                API_PREFIX=$(API_PREFIX)
+                EOF
+                echo "✓ Archivo .env creado"
+
+                # 6. Reiniciar con PM2
                 pm2 restart bakery_core || pm2 start dist/main.js --name "bakery_core"
                 echo "✓ Aplicación iniciada con PM2"
                 

@@ -1,39 +1,50 @@
-# ETAPA 1: Construcción (Build)
+# --- Etapa 1: Compilar ---
 FROM node:22-alpine AS builder
 WORKDIR /app
 
-# Habilitamos pnpm con corepack
+# OpenSSL requerido por Prisma
+RUN apk add --no-cache openssl
+
+# Habilitar pnpm
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-# Copiar solo los archivos de configuración para aprovechar la caché de capas de Docker
+# Aprovechar caché de capas instalando dependencias primero
 COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
 
-# Instalar las dependencias (tanto de desarrollo como producción)
-RUN pnpm install --frozen-lockfile --ignore-scripts
-
-# Copiar el resto del código fuente del proyecto
+# Copiar código fuente y schema de Prisma
 COPY . .
 
-# Compilar el proyecto NestJS (genera la carpeta dist/)
+# Generar cliente de Prisma y compilar
+RUN pnpm prisma:generate
 RUN pnpm run build
 
-# Eliminar dependencias de desarrollo para dejar solo las necesarias en producción
+# Verificar que el build generó el dist
+RUN ls -la dist/
+
+# Eliminar devDependencies
 RUN pnpm prune --prod
 
-# ETAPA 2: Entorno de Ejecución (Runtime)
-FROM node:22-alpine AS runner
+# --- Etapa 2: Producción ---
+FROM node:22-alpine
 WORKDIR /app
 
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# OpenSSL requerido por Prisma en runtime
+RUN apk add --no-cache openssl
 
-# Copiar solo lo necesario desde el builder
-COPY --from=builder /app/node_modules ./node_modules
+COPY package.json ./
+
+# Copiar artefactos del builder
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/package.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY prisma ./prisma
+COPY start.sh .
+RUN chmod +x start.sh
 
-# Puerto expuesto por NestJS
+# Verificar que dist existe antes de arrancar
+RUN ls -la dist/
+
 EXPOSE 3000
-
-# Comando para iniciar la aplicación
-CMD ["node", "dist/main"]
-
+CMD ["sh", "start.sh"]
