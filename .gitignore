@@ -2,6 +2,8 @@
 /dist
 /node_modules
 /build
+/postgres
+/uploads
 
 # Logs
 logs
@@ -54,3 +56,6 @@ pids
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Prisma
+prisma/migrations/*.sql.bak
