@@ -2,11 +2,11 @@
 FROM node:22-alpine AS builder
 WORKDIR /app
 
-# OpenSSL requerido por Prisma
-RUN apk add --no-cache openssl
+# OpenSSL + herramientas de compilación para módulos nativos (bcrypt)
+RUN apk add --no-cache openssl python3 make g++
 
-# Habilitar pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# Habilitar pnpm v9 (compatible con lockfileVersion 9.0)
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 
 # Aprovechar caché de capas instalando dependencias primero
 COPY package.json pnpm-lock.yaml ./
@@ -37,8 +37,6 @@ COPY package.json ./
 # Copiar artefactos del builder
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY prisma ./prisma
 COPY start.sh .
 RUN chmod +x start.sh
