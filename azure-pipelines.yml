@@ -37,7 +37,7 @@ stages:
           # Paso 2: Restaurar dependencias
           - script: |
               corepack enable
-              corepack prepare pnpm@latest --activate
+              corepack prepare pnpm@9.15.9 --activate
             displayName: 'Restaurar: Activar pnpm'
 
           - script: |
@@ -83,7 +83,7 @@ stages:
           # Paso 2: Instalar dependencias
           - script: |
               corepack enable
-              corepack prepare pnpm@latest --activate
+              corepack prepare pnpm@9.15.9 --activate
               pnpm install --no-frozen-lockfile --ignore-scripts
             displayName: 'Restaurar: Instalar dependencias'
 
