@@ -1,98 +1,316 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Bakery Pro — Backend API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+API REST construida con **NestJS** y **TypeScript** que expone todos los servicios del sistema de gestión de pastelería. Gestiona autenticación, usuarios, inventario, producción, ventas, facturación y delivery.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Tabla de Contenidos
 
-## Description
+- [Requisitos previos](#requisitos-previos)
+- [Instalación y ejecución](#instalación-y-ejecución)
+- [Variables de entorno](#variables-de-entorno)
+- [Base de datos y Prisma](#base-de-datos-y-prisma)
+- [Endpoints de la API](#endpoints-de-la-api)
+- [Scripts disponibles](#scripts-disponibles)
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+---
 
-## Project setup
+## Requisitos Previos
 
-```bash
-$ pnpm install
-```
+- **Node.js** >= 24.x
+- **pnpm** >= 9.x
+- **PostgreSQL** >= 16 corriendo localmente (o vía Docker)
 
-## Compile and run the project
+> Para levantar solo la base de datos con Docker:
+> ```bash
+> docker-compose up -d
+> ```
+
+---
+
+## Instalación y Ejecución
+
+### 1. Instalar dependencias
 
 ```bash
-# development
-$ pnpm run start
-
-# watch mode
-$ pnpm run start:dev
-
-# production mode
-$ pnpm run start:prod
+pnpm install
 ```
 
-## Run tests
+### 2. Configurar variables de entorno
 
 ```bash
-# unit tests
-$ pnpm run test
-
-# e2e tests
-$ pnpm run test:e2e
-
-# test coverage
-$ pnpm run test:cov
+cp .env.template .env
 ```
 
-## Deployment
+Editar `.env` con los valores correctos (ver sección [Variables de entorno](#variables-de-entorno)).
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### 3. Generar el cliente Prisma
 
 ```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+pnpm run prisma:generate
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### 4. Ejecutar las migraciones
 
-## Resources
+```bash
+# Modo desarrollo (crea la migración y la aplica)
+pnpm run prisma:migrate
 
-Check out a few resources that may come in handy when working with NestJS:
+# Modo producción (aplica migraciones existentes sin crear nuevas)
+pnpm run prisma:migrate:prod
+```
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+### 5. Poblar datos iniciales
 
-## Support
+```bash
+pnpm run prisma:seed
+```
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+Crea: usuarios de prueba (5 roles), categorías de ejemplo y productos base.
 
-## Stay in touch
+### 6. Iniciar el servidor
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+```bash
+# Desarrollo con hot-reload
+pnpm run start:dev
 
-## License
+# Producción
+pnpm run build
+pnpm run start:prod
+```
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+El servidor estará disponible en: `http://localhost:3000`
+
+---
+
+## Variables de Entorno
+
+| Variable | Descripción | Ejemplo |
+|----------|-------------|---------|
+| `DATABASE_URL` | Cadena de conexión PostgreSQL | `postgresql://user:pass@localhost:5432/bakery_db` |
+| `JWT_SECRET` | Clave secreta para access tokens | cadena aleatoria larga |
+| `JWT_EXPIRES_IN` | Expiración del access token | `15m` |
+| `JWT_REFRESH_SECRET` | Clave secreta para refresh tokens | cadena aleatoria larga |
+| `JWT_REFRESH_EXPIRES_IN` | Expiración del refresh token | `7d` |
+| `PORT` | Puerto del servidor | `3000` |
+| `API_PREFIX` | Prefijo global de la API | `api/v1` |
+
+> **Seguridad:** Nunca subas el archivo `.env` al repositorio. Usa valores fuertes y únicos para `JWT_SECRET` y `JWT_REFRESH_SECRET` en producción.
+
+---
+
+## Base de Datos y Prisma
+
+### Modelos principales
+
+| Modelo | Descripción |
+|--------|-------------|
+| `User` | Usuarios del sistema con roles |
+| `Customer` | Clientes de la pastelería |
+| `Category` | Categorías de productos |
+| `Product` | Productos con precio y stock |
+| `Ingredient` | Ingredientes del inventario |
+| `InventoryMovement` | Movimientos de stock (kardex) |
+| `Recipe` | Recetas vinculadas a productos |
+| `RecipeDetail` | Líneas de ingredientes de una receta |
+| `Order` | Pedidos personalizados de clientes |
+| `OrderDetail` | Líneas de productos de un pedido |
+| `ProductionOrder` | Órdenes de producción |
+| `Sale` | Transacciones de venta |
+| `SaleDetail` | Líneas de una venta |
+| `Payment` | Pagos asociados a una venta |
+| `Invoice` | Facturas generadas |
+| `Delivery` | Registro de entregas a domicilio |
+| `CashRegister` | Sesiones de caja |
+
+### Comandos de Prisma
+
+```bash
+# Generar cliente tras cambiar el schema
+pnpm run prisma:generate
+
+# Crear migración en desarrollo
+pnpm run prisma:migrate
+
+# Aplicar migraciones en producción
+pnpm run prisma:migrate:prod
+
+# Resetear BD (solo desarrollo)
+pnpm run prisma:reset
+
+# Poblar datos iniciales
+pnpm run prisma:seed
+
+# Abrir GUI de base de datos
+pnpm run prisma:studio
+```
+
+---
+
+## Endpoints de la API
+
+Todos los endpoints tienen el prefijo `/api/v1`. La documentación completa e interactiva está en `/api/docs`.
+
+### Autenticación
+
+```
+POST   /auth/login               Iniciar sesión
+POST   /auth/refresh             Renovar access token
+POST   /auth/logout              Cerrar sesión
+GET    /auth/profile             Perfil del usuario actual
+PATCH  /auth/profile             Actualizar perfil propio
+PATCH  /auth/profile/password    Cambiar contraseña
+```
+
+### Usuarios
+
+```
+GET    /users                    Listar usuarios (paginado, filtro por rol)
+POST   /users                    Crear usuario
+GET    /users/:id                Obtener usuario por ID
+PATCH  /users/:id                Actualizar usuario
+PATCH  /users/:id/toggle-active  Activar / desactivar usuario
+DELETE /users/:id                Eliminar usuario (soft delete)
+```
+
+### Clientes
+
+```
+GET    /customers                Listar clientes (paginado, búsqueda)
+POST   /customers                Crear cliente
+GET    /customers/:id            Obtener cliente
+PATCH  /customers/:id            Actualizar cliente
+DELETE /customers/:id            Eliminar cliente
+```
+
+### Productos y Categorías
+
+```
+GET    /products                 Listar productos (filtros: categoría, búsqueda)
+POST   /products                 Crear producto
+GET    /products/:id             Obtener producto
+PATCH  /products/:id             Actualizar producto
+DELETE /products/:id             Eliminar producto
+
+GET    /products/categories      Listar categorías
+POST   /products/categories      Crear categoría
+PATCH  /products/categories/:id  Actualizar categoría
+DELETE /products/categories/:id  Eliminar categoría
+```
+
+### Inventario
+
+```
+GET    /inventory/ingredients              Listar ingredientes (paginado)
+POST   /inventory/ingredients              Crear ingrediente
+GET    /inventory/ingredients/:id          Obtener ingrediente
+PATCH  /inventory/ingredients/:id          Actualizar ingrediente
+DELETE /inventory/ingredients/:id          Eliminar ingrediente
+GET    /inventory/ingredients/:id/kardex   Kardex del ingrediente
+POST   /inventory/movements                Registrar movimiento (entrada/salida/ajuste)
+GET    /inventory/alerts/low-stock         Ingredientes con stock bajo
+```
+
+### Recetas
+
+```
+GET    /recipes              Listar recetas
+POST   /recipes              Crear receta con ingredientes
+GET    /recipes/:id          Obtener receta con detalle
+PATCH  /recipes/:id          Actualizar receta
+DELETE /recipes/:id          Eliminar receta
+GET    /recipes/:id/cost     Calcular costo de la receta
+```
+
+### Producción
+
+```
+GET    /production           Listar órdenes (filtro por estado)
+POST   /production           Crear orden de producción
+GET    /production/:id       Obtener orden con detalle
+PATCH  /production/:id/status   Avanzar estado
+PATCH  /production/:id/assign   Asignar pastelero
+```
+
+### Pedidos
+
+```
+GET    /orders               Listar pedidos (filtros: estado, búsqueda)
+POST   /orders               Crear pedido
+GET    /orders/:id           Obtener pedido completo
+PATCH  /orders/:id/status    Cambiar estado manualmente
+PATCH  /orders/:id/cancel    Cancelar pedido
+```
+
+### Ventas
+
+```
+GET    /sales                Listar ventas (filtros: estado, búsqueda)
+POST   /sales                Registrar venta (POS o cobro de pedido)
+GET    /sales/summary/daily  Resumen diario de ventas
+PATCH  /sales/:id/complete   Completar venta pendiente
+POST   /sales/cash-register/open         Abrir caja
+POST   /sales/cash-register/:id/close    Cerrar caja
+```
+
+### Facturas
+
+```
+GET    /invoices             Listar facturas
+GET    /invoices/:id         Obtener factura
+GET    /invoices/:id/data    Datos para imprimir
+GET    /invoices/:id/pdf     Descargar PDF
+PATCH  /invoices/:id/cancel  Anular factura
+```
+
+### Delivery
+
+```
+POST   /delivery                        Crear registro de entrega
+GET    /delivery                        Listar entregas (filtro por estado)
+GET    /delivery/:id                    Obtener entrega
+PATCH  /delivery/:id/assign             Asignar repartidor
+PATCH  /delivery/:id/status             Actualizar estado de entrega
+POST   /delivery/:id/register-payment   Registrar pago contra entrega
+```
+
+### Reportes
+
+```
+GET    /reports/dashboard          Estadísticas generales
+GET    /reports/sales-chart        Gráfico de ventas por día
+GET    /reports/top-products       Productos más vendidos
+GET    /reports/sales-by-category  Ventas por categoría
+GET    /reports/production-summary Resumen de producción
+GET    /reports/low-stock          Ingredientes con stock bajo
+```
+
+### Upload
+
+```
+POST   /upload               Subir imagen optimizada (devuelve URL pública)
+```
+
+---
+
+## Scripts Disponibles
+
+```bash
+pnpm run start:dev           # Desarrollo con hot-reload
+pnpm run start:debug         # Desarrollo con inspector de Node
+pnpm run build               # Compilar TypeScript
+pnpm run start:prod          # Ejecutar build compilado
+
+pnpm run lint                # ESLint
+pnpm run format              # Prettier
+
+pnpm run test                # Tests unitarios (Jest)
+pnpm run test:watch          # Tests en modo watch
+pnpm run test:cov            # Tests con reporte de cobertura
+pnpm run test:e2e            # Tests end-to-end
+
+pnpm run prisma:generate     # Generar cliente Prisma
+pnpm run prisma:migrate      # Crear y aplicar migración (dev)
+pnpm run prisma:migrate:prod # Aplicar migraciones (prod)
+pnpm run prisma:seed         # Datos iniciales
+pnpm run prisma:studio       # GUI visual de la BD
+pnpm run prisma:reset        # Resetear BD completa (dev)
+```
