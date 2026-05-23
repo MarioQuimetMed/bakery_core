@@ -44,12 +44,17 @@ stages:
               pnpm install --no-frozen-lockfile --ignore-scripts
             displayName: 'Restaurar: Instalar dependencias con pnpm'
 
-          # Paso 3: Compilar aplicación
+          # Paso 3: Generar cliente de Prisma
+          - script: |
+              pnpm run prisma:generate
+            displayName: 'Generar: Cliente Prisma'
+
+          # Paso 4: Compilar aplicación
           - script: |
               pnpm run build
             displayName: 'Compilar: Build NestJS project'
 
-          # Paso 4: Publicar artefactos de build (dist)
+          # Paso 5: Publicar artefactos de build (dist)
           - task: PublishBuildArtifacts@1
             displayName: 'Publicar: Artefactos de build (dist)'
             inputs:
@@ -82,12 +87,17 @@ stages:
               pnpm install --no-frozen-lockfile --ignore-scripts
             displayName: 'Restaurar: Instalar dependencias'
 
-          # Paso 3: Compilar para tests
+          # Paso 3: Generar cliente de Prisma
+          - script: |
+              pnpm run prisma:generate
+            displayName: 'Generar: Cliente Prisma'
+
+          # Paso 4: Compilar para tests
           - script: |
               pnpm run build
             displayName: 'Compilar: Build NestJS project'
 
-          # Paso 4: Construir imagen Docker
+          # Paso 5: Construir imagen Docker
           - script: |
               docker build \
                 --tag $(imageName):$(imageTag) \
@@ -115,7 +125,7 @@ stages:
           - script: |
               echo "Esperando que la app inicie..."
               sleep 15
-              if curl --fail http://localhost:3000; then
+              if curl --fail http://localhost:3000/$(API_PREFIX); then
                 echo "✓ OK - La app responde correctamente"
               else
                 echo "✗ ERROR - La app no responde"
