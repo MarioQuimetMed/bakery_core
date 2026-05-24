@@ -3,7 +3,7 @@
 # Trigger automático en cambios en main
 
 trigger:
-  - main
+  - benjamin-dev
 
 pool:
   vmImage: 'ubuntu-latest'
