@@ -51,8 +51,7 @@ export class ProductoController {
     @Body() dto: CreateProductoDto,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    const urlImagen = file ? `/uploads/productos/${file.filename}` : undefined;
-    return this.productoService.create(dto, urlImagen);
+    return this.productoService.create(dto, file?.path);
   }
 
   @Get()

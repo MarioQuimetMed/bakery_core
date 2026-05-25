@@ -103,6 +103,7 @@ stages:
                 -e DATABASE_URL="$(DATABASE_URL)" \
                 -e PORT="$(PORT)" \
                 -e API_PREFIX="$(API_PREFIX)" \
+                -e CLOUDINARY_URL="$(CLOUDINARY_URL)" \
                 $(imageName):latest
               echo "✓ Contenedor iniciado"
             displayName: 'Test: Ejecutar contenedor'
@@ -180,8 +181,12 @@ stages:
                   echo "Archivo .env no encontrado. Creando uno base..."
                   echo "PORT=3000" > .env
                   echo "NODE_ENV=production" >> .env
+                  echo "CLOUDINARY_URL=$(CLOUDINARY_URL)" >> .env
                 else
                   echo "✓ Archivo .env detectado. Se mantendrán tus variables manuales."
+                  if ! grep -q '^CLOUDINARY_URL=' .env; then
+                    echo "CLOUDINARY_URL=$(CLOUDINARY_URL)" >> .env
+                  fi
                 fi
 
                 # 3. Construir la imagen Docker en producción utilizando los artefactos recibidos

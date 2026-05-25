@@ -1,23 +1,39 @@
 import { Inject, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { unlink } from 'fs/promises';
 import { Pool } from 'pg';
 import { DATABASE_POOL } from '../database/database.provider';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { CreateProductoDto } from './dto/create-producto.dto';
 
 @Injectable()
 export class ProductoService {
-  constructor(@Inject(DATABASE_POOL) private readonly pool: Pool) {}
+  constructor(
+    @Inject(DATABASE_POOL) private readonly pool: Pool,
+    private readonly cloudinaryService: CloudinaryService,
+  ) {}
 
-  async create(dto: CreateProductoDto, urlImagen?: string) {
+  async create(dto: CreateProductoDto, imagePath?: string) {
+    let urlImagen: string | null = null;
+
     try {
+      if (imagePath) {
+        urlImagen = await this.cloudinaryService.uploadImage(imagePath);
+      }
+
       const { rows } = await this.pool.query(
         `INSERT INTO producto (nombre, descripcion, url_image, created_at, update_at)
          VALUES ($1, $2, $3, NOW(), NOW())
          RETURNING id, TRIM(nombre) AS nombre, TRIM(descripcion) AS descripcion, url_image, created_at, update_at`,
-        [dto.nombre, dto.descripcion ?? null, urlImagen ?? null],
+        [dto.nombre, dto.descripcion ?? null, urlImagen],
       );
       return rows[0];
     } catch (err) {
-      throw new InternalServerErrorException(`Error al crear producto: ${err.message}`);
+      const message = err instanceof Error ? err.message : 'Error desconocido';
+      throw new InternalServerErrorException(`Error al crear producto: ${message}`);
+    } finally {
+      if (imagePath) {
+        await unlink(imagePath).catch(() => undefined);
+      }
     }
   }
 
@@ -29,7 +45,8 @@ export class ProductoService {
       );
       return rows;
     } catch (err) {
-      throw new InternalServerErrorException(`Error al obtener productos: ${err.message}`);
+      const message = err instanceof Error ? err.message : 'Error desconocido';
+      throw new InternalServerErrorException(`Error al obtener productos: ${message}`);
     }
   }
 
@@ -46,7 +63,8 @@ export class ProductoService {
       return rows[0];
     } catch (err) {
       if (err instanceof NotFoundException) throw err;
-      throw new InternalServerErrorException(`Error al obtener el producto: ${err.message}`);
+      const message = err instanceof Error ? err.message : 'Error desconocido';
+      throw new InternalServerErrorException(`Error al obtener el producto: ${message}`);
     }
   }
 
@@ -67,7 +85,8 @@ export class ProductoService {
       return rows[0];
     } catch (err) {
       if (err instanceof NotFoundException) throw err;
-      throw new InternalServerErrorException(`Error al actualizar el producto: ${err.message}`);
+      const message = err instanceof Error ? err.message : 'Error desconocido';
+      throw new InternalServerErrorException(`Error al actualizar el producto: ${message}`);
     }
   }
 
@@ -83,7 +102,8 @@ export class ProductoService {
       return { message: `Producto con ID ${id} eliminado correctamente` };
     } catch (err) {
       if (err instanceof NotFoundException) throw err;
-      throw new InternalServerErrorException(`Error al eliminar el producto: ${err.message}`);
+      const message = err instanceof Error ? err.message : 'Error desconocido';
+      throw new InternalServerErrorException(`Error al eliminar el producto: ${message}`);
     }
   }
 }
