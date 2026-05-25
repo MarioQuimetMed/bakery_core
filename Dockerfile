@@ -1,24 +1,17 @@
-# ETAPA 1: Construcción (Build)
-FROM node:24-alpine AS builder
+FROM node:24-alpine
 WORKDIR /app
 
+# Activar pnpm
 RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 
+# Copiar manifiestos
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile --ignore-scripts
 
-COPY . .
-RUN pnpm run build
+# Instalar SOLO dependencias de producción (es rapidísimo y ligero)
+RUN pnpm install --prod --frozen-lockfile --ignore-scripts
 
-RUN pnpm prune --prod
-
-# ETAPA 2: Entorno de Ejecución (Runtime)
-FROM node:24-alpine AS runner
-WORKDIR /app
-
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/package.json ./
+# Copiar la carpeta dist que Azure DevOps ya compiló y envió
+COPY dist ./dist
 
 EXPOSE 3000
 
