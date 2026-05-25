@@ -221,7 +221,8 @@ stages:
                 echo "✓ pnpm activado"
 
                 # 4. Instalar dependencias de producción
-                CI=true pnpm install --prod --no-frozen-lockfile --ignore-scripts
+                export NODE_NO_WARNINGS=1
+                CI=true pnpm install --prod --frozen-lockfile --ignore-scripts
                 echo "✓ Dependencias instaladas"
 
                 # 5. Crear archivo .env con variables del pipeline
