@@ -229,6 +229,7 @@ stages:
                 echo "PORT=$(PORT)" >> .env
                 echo "API_PREFIX=$(API_PREFIX)" >> .env
                 echo "NODE_ENV=production" >> .env
+                echo "NODE_NO_WARNINGS=1" >> .env
                 echo "✓ Archivo .env creado"
 
                 # 6. Reiniciar con PM2
