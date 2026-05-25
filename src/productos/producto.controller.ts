@@ -74,8 +74,14 @@ export class ProductoController {
   @Put(':id')
   @ApiOperation({ summary: 'Actualizar un producto por ID' })
   @ApiParam({ name: 'id', type: 'number', description: 'ID del producto' })
-  @ApiResponse({ status: 200, description: 'Producto actualizado' })
-  update(@Param('id') id: string, @Body() updateData: any) {
+  @ApiBody({ 
+    description: 'Datos a actualizar del producto',
+    type: CreateProductoDto, 
+    required: false 
+  })
+  @ApiResponse({ status: 200, description: 'Producto actualizado exitosamente' })
+  @ApiResponse({ status: 404, description: 'Producto no encontrado' })
+  update(@Param('id') id: string, @Body() updateData: Partial<CreateProductoDto>) {
     return this.productoService.update(+id, updateData);
   }
 
@@ -83,7 +89,8 @@ export class ProductoController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Eliminar un producto por ID' })
   @ApiParam({ name: 'id', type: 'number', description: 'ID del producto' })
-  @ApiResponse({ status: 204, description: 'Producto eliminado' })
+  @ApiResponse({ status: 204, description: 'Producto eliminado exitosamente' })
+  @ApiResponse({ status: 404, description: 'Producto no encontrado' })
   remove(@Param('id') id: string) {
     return this.productoService.remove(+id);
   }
