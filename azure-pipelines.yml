@@ -9,14 +9,18 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  imageName: 'bakery-core'
-  imageTag: '$(Build.BuildId)'
-  nodeVersion: '24.15.0'
+  - group: bakery-secrets
+  - name: imageName
+    value: 'bakery-core'
+  - name: imageTag
+    value: '$(Build.BuildId)'
+  - name: nodeVersion
+    value: '24.15.0'
 
 stages:
   # ============================================================================
   # STAGE 1: CI (Integración Continua)
-  # Objetivo: Validar que el código compila correctamente
+  # Objetivo: Validar que el código compila y publicar artefactos para entrega
   # ============================================================================
   - stage: CI
     displayName: 'Stage 1: CI - Integración Continua'
@@ -33,11 +37,11 @@ stages:
           # Paso 2: Restaurar dependencias
           - script: |
               corepack enable
-              corepack prepare pnpm@latest --activate
+              corepack prepare pnpm@9.15.9 --activate
             displayName: 'Restaurar: Activar pnpm'
 
           - script: |
-              pnpm install --no-frozen-lockfile --ignore-scripts
+              pnpm install --frozen-lockfile --ignore-scripts
             displayName: 'Restaurar: Instalar dependencias con pnpm'
 
           # Paso 3: Compilar aplicación
@@ -45,16 +49,27 @@ stages:
               pnpm run build
             displayName: 'Compilar: Build NestJS project'
 
-          # Paso 4: Publicar artefactos de build (dist)
+          # Paso 4: Empaquetar artefactos (dist + manifests)
+          - task: CopyFiles@2
+            displayName: 'Preparar: Empaquetar artefactos para entrega'
+            inputs:
+              SourceFolder: '$(Build.SourcesDirectory)'
+              Contents: |
+                dist/**
+                package.json
+                pnpm-lock.yaml
+              TargetFolder: '$(Build.ArtifactStagingDirectory)'
+
+          # Paso 5: Publicar artefactos de build
           - task: PublishBuildArtifacts@1
-            displayName: 'Publicar: Artefactos de build (dist)'
+            displayName: 'Publicar: Artefactos de build'
             inputs:
               pathToPublish: '$(Build.ArtifactStagingDirectory)'
               artifactName: 'dist-output'
 
   # ============================================================================
   # STAGE 2: Testing (Pruebas y Validación de Calidad)
-  # Objetivo: Ejecutar pruebas unitarias y validar funcionamiento
+  # Objetivo: Construir imagen Docker y validar que la app arranca correctamente
   # Condición: Solo se ejecuta si CI es exitoso
   # ============================================================================
   - stage: Testing
@@ -74,8 +89,8 @@ stages:
           # Paso 2: Instalar dependencias
           - script: |
               corepack enable
-              corepack prepare pnpm@latest --activate
-              pnpm install --no-frozen-lockfile --ignore-scripts
+              corepack prepare pnpm@9.15.9 --activate
+              pnpm install --frozen-lockfile --ignore-scripts
             displayName: 'Restaurar: Instalar dependencias'
 
           # Paso 3: Compilar para tests
@@ -91,20 +106,23 @@ stages:
                 .
             displayName: 'Test: Construir imagen Docker'
 
-          # Paso 5: Ejecutar contenedor para validación
+          # Paso 5: Ejecutar contenedor con variables de entorno
           - script: |
               docker run -d \
                 --name bakery-test \
                 -p 3000:3000 \
+                -e DATABASE_URL="$(DATABASE_URL)" \
+                -e PORT="$(PORT)" \
+                -e API_PREFIX="$(API_PREFIX)" \
                 $(imageName):latest
               echo "✓ Contenedor iniciado"
             displayName: 'Test: Ejecutar contenedor'
 
-          # Paso 6: Validar funcionamiento de la aplicación
+          # Paso 6: Validar que la app responde correctamente
           - script: |
               echo "Esperando que la app inicie..."
               sleep 15
-              if curl --fail http://localhost:3000; then
+              if curl --fail http://localhost:3000/$(API_PREFIX); then
                 echo "✓ OK - La app responde correctamente"
               else
                 echo "✗ ERROR - La app no responde"
@@ -141,7 +159,7 @@ stages:
 
   # ============================================================================
   # STAGE 3: Delivery (Entrega y Despliegue)
-  # Objetivo: Publicar y desplegar la aplicación en producción
+  # Objetivo: Enviar artefactos al servidor y reiniciar la aplicación con PM2
   # Condición: Solo se ejecuta si CI y Testing son exitosos
   # ============================================================================
   - stage: Delivery
@@ -152,56 +170,73 @@ stages:
       - job: DeliveryJob
         displayName: 'Deploy: Publicar en Digital Ocean'
         steps:
-          # Paso 1: Publicar aplicación (generar artefactos)
-          - script: |
-              echo "=== Preparando artefactos para entrega ==="
-              ls -la dist/
-              echo "✓ Artefactos listos para despliegue"
-            displayName: 'Deploy: Publicar aplicación'
+          # Paso 1: Descargar artefactos compilados desde el stage CI
+          - task: DownloadBuildArtifacts@0
+            displayName: 'Deploy: Descargar artefactos de build'
+            inputs:
+              buildType: 'current'
+              downloadType: 'single'
+              artifactName: 'dist-output'
+              downloadPath: '$(System.ArtifactsDirectory)'
 
-          # Paso 2: Generar artefactos (archivos compilados)
+          # Paso 2: Verificar que los artefactos están disponibles
+          - script: |
+              echo "=== Artefactos listos para despliegue ==="
+              ls -la $(System.ArtifactsDirectory)/dist-output/dist/
+              echo "✓ Artefactos verificados"
+            displayName: 'Deploy: Verificar artefactos'
+
+          # Paso 3: Enviar artefactos al servidor
           - task: CopyFilesOverSSH@0
             displayName: 'Deploy: Enviar artefactos al servidor'
             inputs:
               sshEndpoint: 'digital_ocean_core'
-              contents: |
-                dist/**
-                package.json
-                pnpm-lock.yaml
+              sourceFolder: '$(System.ArtifactsDirectory)/dist-output'
+              contents: '**'
               targetFolder: '/var/www/bakery-core'
+              cleanTargetFolder: false
               readyTimeout: '30000'
 
-          # Paso 3: Confirmar entrega e iniciar en producción
+          # Paso 4: Instalar dependencias y reiniciar en producción
           - task: SSH@0
             displayName: 'Deploy: Instalar y reiniciar en producción'
             inputs:
               sshEndpoint: 'digital_ocean_core'
               runOptions: 'inline'
+              failOnStdErr: false
               inline: |
                 echo "=== Confirmando entrega en producción ==="
-                
+
                 # 1. Cargar entorno de Node/NVM
                 export NVM_DIR="$HOME/.nvm"
                 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-                
+
                 # 2. Entrar a la carpeta de despliegue
                 cd /var/www/bakery-core
                 echo "✓ Directorio: $(pwd)"
-                
+
                 # 3. Activar corepack y pnpm
                 corepack enable
-                corepack prepare pnpm@latest --activate
+                corepack prepare pnpm@9.15.9 --activate
                 echo "✓ pnpm activado"
-                
+
                 # 4. Instalar dependencias de producción
-                pnpm install --prod --ignore-scripts
+                CI=true pnpm install --prod --no-frozen-lockfile --ignore-scripts
                 echo "✓ Dependencias instaladas"
-                
-                # 5. Reiniciar con PM2
+
+                # 5. Crear archivo .env con variables del pipeline
+                echo "DATABASE_URL=$(DATABASE_URL)" > .env
+                echo "PORT=$(PORT)" >> .env
+                echo "API_PREFIX=$(API_PREFIX)" >> .env
+                echo "NODE_ENV=production" >> .env
+                echo "✓ Archivo .env creado"
+
+                # 6. Reiniciar con PM2
                 pm2 restart bakery_core || pm2 start dist/main.js --name "bakery_core"
+                pm2 save
                 echo "✓ Aplicación iniciada con PM2"
-                
-                # 6. Mostrar estado final
+
+                # 7. Mostrar estado final
                 echo "=== Estado de despliegue ==="
                 pm2 list
               readyTimeout: '30000'

@@ -6,3 +6,5 @@ dist
 coverage
 .env*
 azure-pipelines.yml
+uploads
+test
