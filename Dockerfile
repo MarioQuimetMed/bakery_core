@@ -7,7 +7,7 @@ RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 # Copiar manifiestos
 COPY package.json pnpm-lock.yaml ./
 
-# Instalar SOLO dependencias de producción (es rapidísimo y ligero)
+# Instalar SOLO dependencias de producción
 RUN pnpm install --prod --frozen-lockfile --ignore-scripts
 
 # Copiar la carpeta dist que Azure DevOps ya compiló y envió
