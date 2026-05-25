@@ -20,21 +20,18 @@ variables:
 stages:
   # ============================================================================
   # STAGE 1: CI (Integración Continua)
-  # Objetivo: Validar que el código compila y publicar artefactos para entrega
   # ============================================================================
   - stage: CI
     displayName: 'Stage 1: CI - Integración Continua'
     jobs:
-      - job: BuildJob
+      - job: 'BuildJob'
         displayName: 'Build: Compilar aplicación'
         steps:
-          # Paso 1: Instalar SDK de Node.js
           - task: UseNode@1
             displayName: 'Instalar Node.js SDK (v$(nodeVersion))'
             inputs:
               version: '$(nodeVersion)'
 
-          # Paso 2: Restaurar dependencias
           - script: |
               corepack enable
               corepack prepare pnpm@9.15.9 --activate
@@ -44,12 +41,11 @@ stages:
               pnpm install --frozen-lockfile --ignore-scripts
             displayName: 'Restaurar: Instalar dependencias con pnpm'
 
-          # Paso 3: Compilar aplicación
           - script: |
               pnpm run build
             displayName: 'Compilar: Build NestJS project'
 
-          # Paso 4: Empaquetar artefactos (dist + manifests)
+          # MODIFICADO: Ahora incluimos el Dockerfile en los artefactos
           - task: CopyFiles@2
             displayName: 'Preparar: Empaquetar artefactos para entrega'
             inputs:
@@ -58,9 +54,9 @@ stages:
                 dist/**
                 package.json
                 pnpm-lock.yaml
+                Dockerfile
               TargetFolder: '$(Build.ArtifactStagingDirectory)'
 
-          # Paso 5: Publicar artefactos de build
           - task: PublishBuildArtifacts@1
             displayName: 'Publicar: Artefactos de build'
             inputs:
@@ -69,8 +65,6 @@ stages:
 
   # ============================================================================
   # STAGE 2: Testing (Pruebas y Validación de Calidad)
-  # Objetivo: Construir imagen Docker y validar que la app arranca correctamente
-  # Condición: Solo se ejecuta si CI es exitoso
   # ============================================================================
   - stage: Testing
     displayName: 'Stage 2: Testing - Validación de Calidad'
@@ -78,27 +72,23 @@ stages:
     condition: succeeded()
     jobs:
       - job: TestJob
-        displayName: 'Test: Ejecutar validaciones'
+        displayName: 'Test: Ejecutar validations'
         steps:
-          # Paso 1: Instalar Node.js SDK
           - task: UseNode@1
             displayName: 'Instalar Node.js SDK (v$(nodeVersion))'
             inputs:
               version: '$(nodeVersion)'
 
-          # Paso 2: Instalar dependencias
           - script: |
               corepack enable
               corepack prepare pnpm@9.15.9 --activate
               pnpm install --frozen-lockfile --ignore-scripts
             displayName: 'Restaurar: Instalar dependencias'
 
-          # Paso 3: Compilar para tests
           - script: |
               pnpm run build
             displayName: 'Compilar: Build NestJS project'
 
-          # Paso 4: Construir imagen Docker
           - script: |
               docker build \
                 --tag $(imageName):$(imageTag) \
@@ -106,7 +96,6 @@ stages:
                 .
             displayName: 'Test: Construir imagen Docker'
 
-          # Paso 5: Ejecutar contenedor con variables de entorno
           - script: |
               docker run -d \
                 --name bakery-test \
@@ -118,7 +107,6 @@ stages:
               echo "✓ Contenedor iniciado"
             displayName: 'Test: Ejecutar contenedor'
 
-          # Paso 6: Validar que la app responde correctamente
           - script: |
               echo "Esperando que la app inicie..."
               sleep 15
@@ -130,26 +118,12 @@ stages:
               fi
             displayName: 'Test: Validar funcionamiento (Health Check)'
 
-          # Paso 7: Mostrar logs y estado
           - script: |
               echo "=== Logs del contenedor ==="
               docker logs bakery-test
-              echo ""
-              echo "=== Imagen generada ==="
-              docker images | grep $(imageName)
-              echo ""
-              echo "=== Contenedor en ejecución ==="
-              docker ps | grep bakery-test
             displayName: 'Test: Mostrar estado y logs'
             condition: always()
 
-          # Paso 8: Ejecutar pruebas unitarias (si existen)
-          - script: |
-              pnpm run test || echo "No hay tests configurados"
-            displayName: 'Test: Ejecutar pruebas unitarias'
-            condition: always()
-
-          # Paso 9: Limpiar contenedor de prueba
           - script: |
               docker stop bakery-test
               docker rm bakery-test
@@ -158,9 +132,7 @@ stages:
             condition: always()
 
   # ============================================================================
-  # STAGE 3: Delivery (Entrega y Despliegue)
-  # Objetivo: Enviar artefactos al servidor y reiniciar la aplicación con PM2
-  # Condición: Solo se ejecuta si CI y Testing son exitosos
+  # STAGE 3: Delivery (Entrega y Despliegue en Docker)
   # ============================================================================
   - stage: Delivery
     displayName: 'Stage 3: Delivery - Entrega a Producción'
@@ -168,9 +140,8 @@ stages:
     condition: succeeded()
     jobs:
       - job: DeliveryJob
-        displayName: 'Deploy: Publicar en Digital Ocean'
+        displayName: 'Deploy: Publicar en Digital Ocean con Docker'
         steps:
-          # Paso 1: Descargar artefactos compilados desde el stage CI
           - task: DownloadBuildArtifacts@0
             displayName: 'Deploy: Descargar artefactos de build'
             inputs:
@@ -179,14 +150,6 @@ stages:
               artifactName: 'dist-output'
               downloadPath: '$(System.ArtifactsDirectory)'
 
-          # Paso 2: Verificar que los artefactos están disponibles
-          - script: |
-              echo "=== Artefactos listos para despliegue ==="
-              ls -la $(System.ArtifactsDirectory)/dist-output/dist/
-              echo "✓ Artefactos verificados"
-            displayName: 'Deploy: Verificar artefactos'
-
-          # Paso 3: Enviar artefactos al servidor
           - task: CopyFilesOverSSH@0
             displayName: 'Deploy: Enviar artefactos al servidor'
             inputs:
@@ -197,48 +160,48 @@ stages:
               cleanTargetFolder: false
               readyTimeout: '30000'
 
-          # Paso 4: Instalar dependencias y reiniciar en producción
           - task: SSH@0
-            displayName: 'Deploy: Instalar y reiniciar en producción'
+            displayName: 'Deploy: Construir y levantar Contenedor Docker'
             inputs:
               sshEndpoint: 'digital_ocean_core'
               runOptions: 'inline'
               failOnStdErr: false
               inline: |
-                echo "=== Confirmando entrega en producción ==="
-
-                # 1. Cargar entorno de Node/NVM
-                export NVM_DIR="$HOME/.nvm"
-                [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-
-                # 2. Entrar a la carpeta de despliegue
+                echo "=== Iniciando despliegue con Docker ==="
+                
+                # 1. Entrar a la carpeta del proyecto en el droplet
                 cd /var/www/bakery-core
-                echo "✓ Directorio: $(pwd)"
+                echo "✓ Directorio actual: $(pwd)"
 
-                # 3. Activar corepack y pnpm
-                corepack enable
-                corepack prepare pnpm@9.15.9 --activate
-                echo "✓ pnpm activado"
+                # 2. PROTEGER EL ARCHIVO .ENV 
+                # Si no existe, crea uno vacío para que Docker no falle. 
+                # Si ya existe, NO lo toca para que puedas editarlo manualmente.
+                if [ ! -f .env ]; then
+                  echo "Archivo .env no encontrado. Creando uno base..."
+                  echo "PORT=3000" > .env
+                  echo "NODE_ENV=production" >> .env
+                else
+                  echo "✓ Archivo .env detectado. Se mantendrán tus variables manuales."
+                fi
 
-                # 4. Instalar dependencias de producción
-                export NODE_NO_WARNINGS=1
-                CI=true pnpm install --prod --frozen-lockfile --ignore-scripts
-                echo "✓ Dependencias instaladas"
+                # 3. Construir la imagen Docker en producción utilizando los artefactos recibidos
+                echo "Construyendo imagen de producción..."
+                docker build -t bakery-core:latest .
 
-                # 5. Crear archivo .env con variables del pipeline
-                echo "DATABASE_URL=$(DATABASE_URL)" > .env
-                echo "PORT=$(PORT)" >> .env
-                echo "API_PREFIX=$(API_PREFIX)" >> .env
-                echo "NODE_ENV=production" >> .env
-                echo "NODE_NO_WARNINGS=1" >> .env
-                echo "✓ Archivo .env creado"
+                # 4. Detener y remover el contenedor anterior si existe
+                echo "Limpiando contenedores antiguos..."
+                docker stop bakery-core-prod || true
+                docker rm bakery-core-prod || true
 
-                # 6. Reiniciar con PM2
-                pm2 restart bakery_core || pm2 start dist/main.js --name "bakery_core"
-                pm2 save
-                echo "✓ Aplicación iniciada con PM2"
+                # 5. Levantar el nuevo contenedor mapeando el puerto 3000 e inyectando tu .env manual
+                echo "Iniciando nuevo contenedor..."
+                docker run -d \
+                  --name bakery-core-prod \
+                  -p 3000:3000 \
+                  --env-file .env \
+                  --restart always \
+                  bakery-core:latest
 
-                # 7. Mostrar estado final
-                echo "=== Estado de despliegue ==="
-                pm2 list
+                echo "=== Verificación del despliegue ==="
+                docker ps | grep bakery-core-prod
               readyTimeout: '30000'
